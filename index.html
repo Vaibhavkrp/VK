@@ -1,0 +1,1448 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>QR Code Studio Pro | Ultimate Generator & Scanner</title>
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Font Awesome -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <!-- Google Fonts Inter -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=Space+Grotesk:wght@600;700&display=swap" rel="stylesheet">
+  <!-- qr-code-styling for high quality styled rendering & logo overlay -->
+  <script type="text/javascript" src="https://unpkg.com/qr-code-styling@1.5.0/lib/qr-code-styling.js"></script>
+  <!-- jsQR for in-browser QR decoding/testing -->
+  <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
+
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['"Plus Jakarta Sans"', 'sans-serif'],
+            display: ['"Space Grotesk"', 'sans-serif'],
+          },
+          colors: {
+            brand: {
+              50: '#eef2ff',
+              100: '#e0e7ff',
+              500: '#6366f1',
+              600: '#4f46e5',
+              700: '#4338ca',
+            }
+          }
+        }
+      }
+    }
+  </script>
+
+  <style>
+    /* Custom Scrollbar */
+    ::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    ::-webkit-scrollbar-track {
+      background: rgba(0, 0, 0, 0.05);
+    }
+    .dark ::-webkit-scrollbar-track {
+      background: rgba(255, 255, 255, 0.05);
+    }
+    ::-webkit-scrollbar-thumb {
+      background: rgba(100, 116, 139, 0.3);
+      border-radius: 9999px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: rgba(100, 116, 139, 0.5);
+    }
+
+    /* Print styles */
+    @media print {
+      body * {
+        visibility: hidden;
+      }
+      #print-area, #print-area * {
+        visibility: visible;
+      }
+      #print-area {
+        position: fixed;
+        left: 50%;
+        top: 50%;
+        transform: translate(-50%, -50%);
+        box-shadow: none !important;
+        border: none !important;
+      }
+      .no-print {
+        display: none !important;
+      }
+    }
+
+    /* Canvas containment inside container */
+    #qr-render-target canvas, #qr-render-target svg {
+      max-width: 100% !important;
+      height: auto !important;
+      border-radius: 0.5rem;
+      display: block;
+      margin: 0 auto;
+    }
+  </style>
+</head>
+<body class="bg-slate-50 text-slate-800 dark:bg-slate-950 dark:text-slate-100 min-h-screen font-sans transition-colors duration-200">
+
+  <!-- Header -->
+  <header class="no-print sticky top-0 z-40 backdrop-blur-md bg-white/80 dark:bg-slate-900/80 border-b border-slate-200/80 dark:border-slate-800">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+      <div class="flex items-center gap-3">
+        <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-indigo-600 via-indigo-500 to-purple-500 flex items-center justify-center text-white shadow-lg shadow-indigo-500/25">
+          <i class="fa-solid fa-qrcode text-xl"></i>
+        </div>
+        <div>
+          <h1 class="text-lg font-bold font-display tracking-tight text-slate-900 dark:text-white flex items-center gap-2">
+            QR Studio <span class="text-xs px-2 py-0.5 rounded-full font-sans font-semibold bg-indigo-100 text-indigo-700 dark:bg-indigo-950/80 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800">PRO</span>
+          </h1>
+          <p class="text-xs text-slate-500 dark:text-slate-400">High Precision Generator & Scanner</p>
+        </div>
+      </div>
+
+      <!-- Header actions -->
+      <div class="flex items-center gap-2 sm:gap-3">
+        <button id="toggle-scanner-modal-btn" class="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs sm:text-sm font-medium rounded-lg text-slate-700 dark:text-slate-200 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 transition">
+          <i class="fa-solid fa-camera"></i>
+          <span class="hidden sm:inline">Test / Scan QR</span>
+        </button>
+
+        <button id="theme-toggle" class="w-9 h-9 rounded-lg flex items-center justify-center text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition" aria-label="Toggle Theme">
+          <i class="fa-solid fa-moon dark:hidden"></i>
+          <i class="fa-solid fa-sun hidden dark:inline"></i>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main Container -->
+  <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
+    <div class="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+
+      <!-- LEFT COLUMN: CONTROLS & SETTINGS (7 Cols) -->
+      <div class="lg:col-span-7 space-y-6">
+
+        <!-- 1. Content Card -->
+        <section class="bg-white dark:bg-slate-900 rounded-2xl p-5 sm:p-6 border border-slate-200/90 dark:border-slate-800 shadow-sm transition">
+          <div class="flex items-center justify-between mb-4">
+            <h2 class="text-base font-bold text-slate-900 dark:text-white flex items-center gap-2">
+              <span class="w-6 h-6 rounded-md bg-indigo-50 dark:bg-indigo-950 text-indigo-600 dark:text-indigo-400 inline-flex items-center justify-center text-xs">1</span>
+              Content & Link
+            </h2>
+            <button id="clear-input-btn" class="text-xs text-slate-400 hover:text-red-500 transition flex items-center gap-1">
+              <i class="fa-solid fa-rotate-left"></i> Reset
+            </button>
+          </div>
+
+          <!-- Quick Template Selector -->
+          <div class="flex flex-wrap gap-1.5 sm:gap-2 mb-4" id="template-chips">
+            <button data-type="url" class="type-btn active px-3 py-1.5 text-xs font-medium rounded-lg border transition flex items-center gap-1.5 bg-indigo-50 border-indigo-200 text-indigo-700 dark:bg-indigo-950/60 dark:border-indigo-800 dark:text-indigo-300">
+              <i class="fa-solid fa-globe"></i> Website
+            </button>
+            <button data-type="wifi" class="type-btn px-3 py-1.5 text-xs font-medium rounded-lg border border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400 hover:border-slate-300 dark:hover:border-slate-700 transition flex items-center gap-1.5">
+              <i class="fa-solid fa-wifi"></i> Wi-Fi
+            </button>
+            <button data-type="vcard" class="type-btn px-3 py-1.5 text-xs font-medium rounded-lg border border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400 hover:border-slate-300 dark:hover:border-slate-700 transition flex items-center gap-1.5">
+              <i class="fa-solid fa-address-card"></i> Contact
+            </button>
+            <button data-type="email" class="type-btn px-3 py-1.5 text-xs font-medium rounded-lg border border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400 hover:border-slate-300 dark:hover:border-slate-700 transition flex items-center gap-1.5">
+              <i class="fa-solid fa-envelope"></i> Email
+            </button>
+            <button data-type="text" class="type-btn px-3 py-1.5 text-xs font-medium rounded-lg border border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400 hover:border-slate-300 dark:hover:border-slate-700 transition flex items-center gap-1.5">
+              <i class="fa-solid fa-align-left"></i> Plain Text
+            </button>
+          </div>
+
+          <!-- Dynamic Input Forms -->
+          <div id="url-form" class="space-y-3">
+            <div class="relative">
+              <input type="text" id="qr-url-input" value="https://google.com" placeholder="https://example.com" class="w-full px-4 py-2.5 text-sm rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/60 focus:bg-white dark:focus:bg-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition pr-10">
+              <button id="quick-clear-text" class="absolute right-3 top-3 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200">
+                <i class="fa-solid fa-xmark text-sm"></i>
+              </button>
+            </div>
+            <!-- Live helper message / validation -->
+            <div id="url-feedback" class="text-xs text-emerald-600 dark:text-emerald-400 flex items-center gap-1.5 font-medium">
+              <i class="fa-solid fa-circle-check"></i> Valid secure web address
+            </div>
+          </div>
+
+          <!-- WiFi Form (Hidden by default) -->
+          <div id="wifi-form" class="hidden space-y-3">
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <input type="text" id="wifi-ssid" placeholder="Network Name (SSID)" class="px-3.5 py-2 text-sm rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/60 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+              <input type="text" id="wifi-pass" placeholder="Password" class="px-3.5 py-2 text-sm rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/60 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+            </div>
+            <div class="flex items-center gap-4 text-xs text-slate-600 dark:text-slate-300">
+              <label class="flex items-center gap-1.5 cursor-pointer">
+                <input type="radio" name="wifi-type" value="WPA" checked class="text-indigo-600 focus:ring-indigo-500"> WPA/WPA2
+              </label>
+              <label class="flex items-center gap-1.5 cursor-pointer">
+                <input type="radio" name="wifi-type" value="WEP" class="text-indigo-600 focus:ring-indigo-500"> WEP
+              </label>
+              <label class="flex items-center gap-1.5 cursor-pointer">
+                <input type="radio" name="wifi-type" value="nopass" class="text-indigo-600 focus:ring-indigo-500"> Open (No Password)
+              </label>
+            </div>
+          </div>
+
+          <!-- Contact Form (Hidden by default) -->
+          <div id="vcard-form" class="hidden space-y-3">
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <input type="text" id="vcard-name" placeholder="Full Name" class="px-3.5 py-2 text-sm rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/60">
+              <input type="text" id="vcard-org" placeholder="Organization / Company" class="px-3.5 py-2 text-sm rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/60">
+            </div>
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <input type="tel" id="vcard-phone" placeholder="Phone Number" class="px-3.5 py-2 text-sm rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/60">
+              <input type="email" id="vcard-email" placeholder="Email Address" class="px-3.5 py-2 text-sm rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/60">
+            </div>
+          </div>
+
+          <!-- Email Form (Hidden by default) -->
+          <div id="email-form" class="hidden space-y-3">
+            <input type="email" id="email-to" placeholder="Recipient: hello@domain.com" class="w-full px-3.5 py-2 text-sm rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/60">
+            <input type="text" id="email-subject" placeholder="Subject" class="w-full px-3.5 py-2 text-sm rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/60">
+          </div>
+
+          <!-- Plain Text Form (Hidden by default) -->
+          <div id="plain-text-form" class="hidden space-y-3">
+            <textarea id="plain-text-content" rows="3" placeholder="Enter arbitrary text or notes..." class="w-full px-3.5 py-2 text-sm rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/60"></textarea>
+          </div>
+        </section>
+
+        <!-- 2. Styling & Colors Customization -->
+        <section class="bg-white dark:bg-slate-900 rounded-2xl p-5 sm:p-6 border border-slate-200/90 dark:border-slate-800 shadow-sm space-y-5">
+          <h2 class="text-base font-bold text-slate-900 dark:text-white flex items-center gap-2">
+            <span class="w-6 h-6 rounded-md bg-indigo-50 dark:bg-indigo-950 text-indigo-600 dark:text-indigo-400 inline-flex items-center justify-center text-xs">2</span>
+            Colors & Shape Styling
+          </h2>
+
+          <!-- Colors Grid -->
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <!-- Foreground / Dots Color -->
+            <div class="p-3.5 rounded-xl border border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/40">
+              <label class="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-2">QR Dots Color</label>
+              <div class="flex items-center gap-2">
+                <input type="color" id="qr-fg-color" value="#0f172a" class="w-9 h-9 rounded-lg border-0 cursor-pointer bg-transparent">
+                <input type="text" id="qr-fg-hex" value="#0f172a" class="w-24 px-2 py-1 text-xs rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-center uppercase font-mono">
+                <div class="flex gap-1">
+                  <button class="w-6 h-6 rounded-full bg-slate-900 border border-white/20 quick-color" data-color="#0f172a"></button>
+                  <button class="w-6 h-6 rounded-full bg-indigo-600 border border-white/20 quick-color" data-color="#4f46e5"></button>
+                  <button class="w-6 h-6 rounded-full bg-emerald-600 border border-white/20 quick-color" data-color="#059669"></button>
+                  <button class="w-6 h-6 rounded-full bg-rose-600 border border-white/20 quick-color" data-color="#e11d48"></button>
+                </div>
+              </div>
+            </div>
+
+            <!-- Background Color & Transparency -->
+            <div class="p-3.5 rounded-xl border border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/40">
+              <div class="flex items-center justify-between mb-2">
+                <label class="text-xs font-semibold text-slate-700 dark:text-slate-300">Background Color</label>
+                <label class="inline-flex items-center gap-1.5 cursor-pointer text-xs text-slate-500 dark:text-slate-400">
+                  <input type="checkbox" id="bg-transparent-toggle" class="rounded border-slate-300 text-indigo-600 focus:ring-0">
+                  Transparent
+                </label>
+              </div>
+              <div class="flex items-center gap-2">
+                <input type="color" id="qr-bg-color" value="#ffffff" class="w-9 h-9 rounded-lg border-0 cursor-pointer bg-transparent">
+                <input type="text" id="qr-bg-hex" value="#ffffff" class="w-24 px-2 py-1 text-xs rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-center uppercase font-mono">
+                <div class="flex gap-1">
+                  <button class="w-6 h-6 rounded-full bg-white border border-slate-300 quick-bg-color" data-color="#ffffff"></button>
+                  <button class="w-6 h-6 rounded-full bg-amber-50 border border-slate-300 quick-bg-color" data-color="#fffbeb"></button>
+                  <button class="w-6 h-6 rounded-full bg-indigo-50 border border-slate-300 quick-bg-color" data-color="#eef2ff"></button>
+                  <button class="w-6 h-6 rounded-full bg-slate-900 border border-white/20 quick-bg-color" data-color="#0f172a"></button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Dot Pattern Style -->
+          <div>
+            <label class="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-2">Dots Pattern Style</label>
+            <div class="grid grid-cols-3 sm:grid-cols-6 gap-2" id="dot-style-container">
+              <button data-dot="rounded" class="dot-btn active p-2 text-xs font-medium rounded-xl border border-indigo-600 bg-indigo-50 text-indigo-700 dark:bg-indigo-950/60 dark:text-indigo-300 flex flex-col items-center gap-1">
+                <i class="fa-solid fa-circle text-sm"></i> Rounded
+              </button>
+              <button data-dot="dots" class="dot-btn p-2 text-xs font-medium rounded-xl border border-slate-200 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700 flex flex-col items-center gap-1">
+                <i class="fa-solid fa-braille text-sm"></i> Dots
+              </button>
+              <button data-dot="classy" class="dot-btn p-2 text-xs font-medium rounded-xl border border-slate-200 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700 flex flex-col items-center gap-1">
+                <i class="fa-solid fa-shapes text-sm"></i> Classy
+              </button>
+              <button data-dot="classy-rounded" class="dot-btn p-2 text-xs font-medium rounded-xl border border-slate-200 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700 flex flex-col items-center gap-1">
+                <i class="fa-solid fa-bezier-curve text-sm"></i> Curvy
+              </button>
+              <button data-dot="square" class="dot-btn p-2 text-xs font-medium rounded-xl border border-slate-200 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700 flex flex-col items-center gap-1">
+                <i class="fa-solid fa-square text-sm"></i> Square
+              </button>
+              <button data-dot="extra-rounded" class="dot-btn p-2 text-xs font-medium rounded-xl border border-slate-200 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700 flex flex-col items-center gap-1">
+                <i class="fa-solid fa-circle-dot text-sm"></i> Bubble
+              </button>
+            </div>
+          </div>
+
+          <!-- Corner Square Style -->
+          <div>
+            <label class="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-2">Corner Eyes Style</label>
+            <div class="grid grid-cols-3 gap-2">
+              <button data-corner="extra-rounded" class="corner-btn active p-2 text-xs font-medium rounded-xl border border-indigo-600 bg-indigo-50 text-indigo-700 dark:bg-indigo-950/60 dark:text-indigo-300 text-center">
+                Rounded
+              </button>
+              <button data-corner="square" class="corner-btn p-2 text-xs font-medium rounded-xl border border-slate-200 dark:border-slate-800 hover:border-slate-300 text-center">
+                Sharp Square
+              </button>
+              <button data-corner="dot" class="corner-btn p-2 text-xs font-medium rounded-xl border border-slate-200 dark:border-slate-800 hover:border-slate-300 text-center">
+                Circular
+              </button>
+            </div>
+          </div>
+        </section>
+
+        <!-- 3. Logo & Icon Integration -->
+        <section class="bg-white dark:bg-slate-900 rounded-2xl p-5 sm:p-6 border border-slate-200/90 dark:border-slate-800 shadow-sm space-y-4">
+          <div class="flex items-center justify-between">
+            <h2 class="text-base font-bold text-slate-900 dark:text-white flex items-center gap-2">
+              <span class="w-6 h-6 rounded-md bg-indigo-50 dark:bg-indigo-950 text-indigo-600 dark:text-indigo-400 inline-flex items-center justify-center text-xs">3</span>
+              Center Logo / Icon Overlay
+            </h2>
+            <button id="remove-logo-btn" class="hidden text-xs text-rose-500 hover:underline">Remove Logo</button>
+          </div>
+
+          <!-- Preset Icons -->
+          <div>
+            <p class="text-xs text-slate-500 dark:text-slate-400 mb-2.5">Pick a popular social preset or upload your brand logo:</p>
+            <div class="flex flex-wrap gap-2" id="logo-presets">
+              <button data-icon="none" class="preset-logo-btn active px-3 py-1.5 text-xs font-medium rounded-lg border border-indigo-600 bg-indigo-50 text-indigo-700 dark:bg-indigo-950/60 dark:text-indigo-300">
+                None
+              </button>
+              <button data-icon="globe" class="preset-logo-btn px-3 py-1.5 text-xs font-medium rounded-lg border border-slate-200 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700 flex items-center gap-1.5">
+                <i class="fa-solid fa-globe text-blue-500"></i> Globe
+              </button>
+              <button data-icon="github" class="preset-logo-btn px-3 py-1.5 text-xs font-medium rounded-lg border border-slate-200 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700 flex items-center gap-1.5">
+                <i class="fa-brands fa-github text-slate-800 dark:text-slate-200"></i> GitHub
+              </button>
+              <button data-icon="twitter" class="preset-logo-btn px-3 py-1.5 text-xs font-medium rounded-lg border border-slate-200 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700 flex items-center gap-1.5">
+                <i class="fa-brands fa-x-twitter text-slate-800 dark:text-slate-200"></i> X
+              </button>
+              <button data-icon="youtube" class="preset-logo-btn px-3 py-1.5 text-xs font-medium rounded-lg border border-slate-200 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700 flex items-center gap-1.5">
+                <i class="fa-brands fa-youtube text-red-600"></i> YouTube
+              </button>
+              <button data-icon="linkedin" class="preset-logo-btn px-3 py-1.5 text-xs font-medium rounded-lg border border-slate-200 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700 flex items-center gap-1.5">
+                <i class="fa-brands fa-linkedin text-blue-600"></i> LinkedIn
+              </button>
+              <button data-icon="instagram" class="preset-logo-btn px-3 py-1.5 text-xs font-medium rounded-lg border border-slate-200 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700 flex items-center gap-1.5">
+                <i class="fa-brands fa-instagram text-pink-600"></i> Instagram
+              </button>
+            </div>
+          </div>
+
+          <!-- Upload custom logo -->
+          <div class="mt-3">
+            <label class="flex flex-col items-center justify-center border-2 border-dashed border-slate-300 dark:border-slate-700 hover:border-indigo-500 dark:hover:border-indigo-400 rounded-xl p-4 cursor-pointer bg-slate-50/50 dark:bg-slate-800/30 transition">
+              <i class="fa-solid fa-cloud-arrow-up text-indigo-500 text-xl mb-1"></i>
+              <span class="text-xs font-medium text-slate-700 dark:text-slate-200">Upload custom PNG/SVG logo</span>
+              <span class="text-[11px] text-slate-400">Centered with automated background shield</span>
+              <input type="file" id="logo-file-input" accept="image/*" class="hidden">
+            </label>
+          </div>
+        </section>
+
+        <!-- 4. Framing / Banner & Print Customizer -->
+        <section class="bg-white dark:bg-slate-900 rounded-2xl p-5 sm:p-6 border border-slate-200/90 dark:border-slate-800 shadow-sm space-y-4">
+          <h2 class="text-base font-bold text-slate-900 dark:text-white flex items-center gap-2">
+            <span class="w-6 h-6 rounded-md bg-indigo-50 dark:bg-indigo-950 text-indigo-600 dark:text-indigo-400 inline-flex items-center justify-center text-xs">4</span>
+            Callout Frame & Border
+          </h2>
+
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label class="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">Frame Banner Text</label>
+              <input type="text" id="frame-text-input" placeholder="e.g. SCAN ME or VISIT US" value="SCAN ME" class="w-full px-3.5 py-2 text-sm rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/60 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+            </div>
+
+            <div>
+              <label class="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">Frame Style</label>
+              <select id="frame-style-select" class="w-full px-3 py-2 text-sm rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/60 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                <option value="none">No Frame (QR Only)</option>
+                <option value="bottom-banner" selected>Bottom Callout Badge</option>
+                <option value="top-bottom">Full Card with Header & Badge</option>
+                <option value="minimal-border">Clean Accent Border</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="flex items-center gap-4">
+            <div>
+              <label class="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">Banner Color</label>
+              <div class="flex items-center gap-2">
+                <input type="color" id="frame-color-picker" value="#4f46e5" class="w-8 h-8 rounded-lg border-0 cursor-pointer bg-transparent">
+                <span class="text-xs font-mono" id="frame-color-display">#4F46E5</span>
+              </div>
+            </div>
+            <div>
+              <label class="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">Banner Text Color</label>
+              <div class="flex items-center gap-2">
+                <input type="color" id="frame-text-color-picker" value="#ffffff" class="w-8 h-8 rounded-lg border-0 cursor-pointer bg-transparent">
+                <span class="text-xs font-mono" id="frame-text-color-display">#FFFFFF</span>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- 5. Advanced Precision (Error Correction & Sizing) -->
+        <section class="bg-white dark:bg-slate-900 rounded-2xl p-5 sm:p-6 border border-slate-200/90 dark:border-slate-800 shadow-sm space-y-4">
+          <h2 class="text-base font-bold text-slate-900 dark:text-white flex items-center gap-2">
+            <span class="w-6 h-6 rounded-md bg-indigo-50 dark:bg-indigo-950 text-indigo-600 dark:text-indigo-400 inline-flex items-center justify-center text-xs">5</span>
+            Resolution & Error Correction
+          </h2>
+
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-5">
+            <!-- Error Correction Level -->
+            <div>
+              <div class="flex items-center justify-between mb-1.5">
+                <label class="text-xs font-semibold text-slate-700 dark:text-slate-300">Error Correction (ECC)</label>
+                <span class="text-[11px] text-indigo-600 dark:text-indigo-400 font-medium cursor-help" title="Higher levels restore QR data even if partially blocked or when placing a logo in the center.">
+                  <i class="fa-solid fa-circle-info"></i> Why ECC?
+                </span>
+              </div>
+              <select id="ecc-select" class="w-full px-3 py-2 text-sm rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/60 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                <option value="L">L - Low (~7% recovery)</option>
+                <option value="M">M - Medium (~15% recovery)</option>
+                <option value="Q" selected>Q - Quartile (~25% recommended for logos)</option>
+                <option value="H">H - High (~30% best for complex logos)</option>
+              </select>
+            </div>
+
+            <!-- Resolution Slider -->
+            <div>
+              <div class="flex items-center justify-between mb-1.5">
+                <label class="text-xs font-semibold text-slate-700 dark:text-slate-300">Export Dimensions</label>
+                <span id="resolution-display" class="text-xs font-mono font-bold text-slate-600 dark:text-slate-400">400 × 400 px</span>
+              </div>
+              <input type="range" id="size-slider" min="200" max="1000" step="50" value="400" class="w-full accent-indigo-600 cursor-pointer">
+              <div class="flex justify-between text-[10px] text-slate-400 mt-1">
+                <span>Web (200px)</span>
+                <span>Standard (400px)</span>
+                <span>Ultra HD (1000px)</span>
+              </div>
+            </div>
+          </div>
+        </section>
+
+      </div>
+
+      <!-- RIGHT COLUMN: STICKY LIVE PREVIEW & EXPORT (5 Cols) -->
+      <div class="lg:col-span-5 sticky top-20 space-y-6">
+
+        <!-- Live Card Preview -->
+        <div class="bg-white dark:bg-slate-900 rounded-3xl p-6 border border-slate-200/90 dark:border-slate-800 shadow-xl shadow-slate-200/40 dark:shadow-none">
+          <div class="flex items-center justify-between pb-4 border-b border-slate-100 dark:border-slate-800">
+            <div>
+              <h3 class="text-sm font-bold text-slate-900 dark:text-white uppercase tracking-wider flex items-center gap-2">
+                <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                Live Preview
+              </h3>
+            </div>
+            <span class="text-xs px-2.5 py-1 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 font-mono" id="live-target-type">URL</span>
+          </div>
+
+          <!-- QR Preview Box Frame wrapper -->
+          <div class="my-6 flex flex-col items-center justify-center">
+            <div id="print-area" class="transition-all duration-200 max-w-full flex flex-col items-center">
+              
+              <!-- Optional Top Banner -->
+              <div id="frame-top-header" class="hidden text-center font-bold text-xs tracking-wider uppercase mb-2 px-4 py-1 rounded-lg">
+                SCAN WITH PHONE
+              </div>
+
+              <!-- Main QR Canvas Wrapper -->
+              <div id="qr-wrapper-box" class="p-4 rounded-2xl bg-white transition-all shadow-sm flex items-center justify-center relative">
+                <div id="qr-render-target" class="flex items-center justify-center"></div>
+              </div>
+
+              <!-- Frame Bottom Badge -->
+              <div id="frame-bottom-badge" class="mt-2.5 px-6 py-2 rounded-xl text-sm font-extrabold tracking-wider uppercase text-center shadow-sm flex items-center gap-2">
+                <i class="fa-solid fa-qrcode text-xs"></i>
+                <span id="frame-caption-text">SCAN ME</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Quick Actions / Copy & Test -->
+          <div class="flex gap-2 mb-4">
+            <button id="copy-qr-btn" class="flex-1 py-2.5 px-3 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-xs font-semibold text-slate-700 dark:text-slate-200 transition flex items-center justify-center gap-1.5">
+              <i class="fa-regular fa-copy"></i>
+              <span>Copy Image</span>
+            </button>
+            <button id="quick-test-btn" class="flex-1 py-2.5 px-3 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-xs font-semibold text-slate-700 dark:text-slate-200 transition flex items-center justify-center gap-1.5">
+              <i class="fa-solid fa-vial-circle-check"></i>
+              <span>Self Verify</span>
+            </button>
+          </div>
+
+          <!-- Download Buttons Grid -->
+          <div class="space-y-2">
+            <div class="grid grid-cols-3 gap-2">
+              <button id="download-png-btn" class="py-2.5 px-3 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs transition flex items-center justify-center gap-1.5 shadow-md shadow-indigo-600/20">
+                <i class="fa-solid fa-download"></i> PNG
+              </button>
+              <button id="download-svg-btn" class="py-2.5 px-3 rounded-xl bg-slate-800 hover:bg-slate-900 text-white dark:bg-slate-700 dark:hover:bg-slate-600 font-semibold text-xs transition flex items-center justify-center gap-1.5">
+                <i class="fa-solid fa-code"></i> SVG
+              </button>
+              <button id="download-jpeg-btn" class="py-2.5 px-3 rounded-xl bg-slate-800 hover:bg-slate-900 text-white dark:bg-slate-700 dark:hover:bg-slate-600 font-semibold text-xs transition flex items-center justify-center gap-1.5">
+                <i class="fa-regular fa-image"></i> JPEG
+              </button>
+            </div>
+
+            <!-- Print friendly button -->
+            <button id="print-sheet-btn" class="w-full py-2.5 px-4 rounded-xl border border-slate-200 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700 bg-transparent text-xs font-semibold text-slate-600 dark:text-slate-300 transition flex items-center justify-center gap-2">
+              <i class="fa-solid fa-print"></i> Print Ready Sheet
+            </button>
+          </div>
+
+          <!-- Feedback Toast Notice -->
+          <div id="toast-message" class="hidden mt-4 p-2.5 rounded-xl bg-emerald-50 dark:bg-emerald-950/80 border border-emerald-200 dark:border-emerald-800 text-emerald-700 dark:text-emerald-300 text-xs text-center font-medium transition animate-fade-in">
+            <i class="fa-solid fa-check mr-1.5"></i> Copied to clipboard!
+          </div>
+        </div>
+
+        <!-- Local History Section -->
+        <div class="bg-white dark:bg-slate-900 rounded-2xl p-5 border border-slate-200/90 dark:border-slate-800 shadow-sm">
+          <div class="flex items-center justify-between mb-3">
+            <h4 class="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 flex items-center gap-2">
+              <i class="fa-solid fa-clock-rotate-left"></i>
+              Recent Codes
+            </h4>
+            <button id="clear-history-btn" class="text-[11px] text-slate-400 hover:text-rose-500">Clear</button>
+          </div>
+          <div id="history-container" class="space-y-2 max-h-48 overflow-y-auto pr-1">
+            <p class="text-xs text-slate-400 italic py-2 text-center" id="empty-history-text">Generated QR codes will be saved here</p>
+          </div>
+        </div>
+
+      </div>
+
+    </div>
+  </main>
+
+  <!-- SCANNER & TESTER MODAL -->
+  <div id="scanner-modal" class="fixed inset-0 z-50 bg-slate-950/70 backdrop-blur-sm hidden items-center justify-center p-4">
+    <div class="bg-white dark:bg-slate-900 rounded-3xl max-w-lg w-full p-6 border border-slate-200 dark:border-slate-800 shadow-2xl space-y-4">
+      <div class="flex items-center justify-between">
+        <h3 class="text-lg font-bold text-slate-900 dark:text-white flex items-center gap-2">
+          <i class="fa-solid fa-expand text-indigo-600"></i> QR Code Scanner & Tester
+        </h3>
+        <button id="close-scanner-modal" class="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 text-xl">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+      </div>
+
+      <p class="text-xs text-slate-500 dark:text-slate-400">
+        Verify that your link scans cleanly before printing or sharing. Use your webcam or upload a file.
+      </p>
+
+      <!-- Video / Camera Stream Box -->
+      <div class="relative rounded-2xl overflow-hidden bg-slate-950 aspect-video flex items-center justify-center border border-slate-800">
+        <video id="scanner-video" class="w-full h-full object-cover hidden" playsinline></video>
+        <canvas id="scanner-canvas" class="hidden"></canvas>
+        <div id="scanner-placeholder" class="text-center p-4 text-slate-400 text-xs">
+          <i class="fa-solid fa-video text-3xl mb-2 text-slate-600"></i>
+          <p>Camera is currently inactive</p>
+        </div>
+      </div>
+
+      <!-- Scanner Controls -->
+      <div class="flex gap-2">
+        <button id="start-camera-btn" class="flex-1 py-2 px-3 text-xs font-semibold rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white transition flex items-center justify-center gap-1.5">
+          <i class="fa-solid fa-camera"></i> Start Camera
+        </button>
+        <button id="stop-camera-btn" class="hidden flex-1 py-2 px-3 text-xs font-semibold rounded-xl bg-slate-700 hover:bg-slate-600 text-white transition flex items-center justify-center gap-1.5">
+          <i class="fa-solid fa-stop"></i> Stop Camera
+        </button>
+        <label class="flex-1 py-2 px-3 text-xs font-semibold rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 cursor-pointer text-center flex items-center justify-center gap-1.5">
+          <i class="fa-solid fa-file-arrow-up"></i> Upload Image
+          <input type="file" id="scan-file-input" accept="image/*" class="hidden">
+        </label>
+      </div>
+
+      <!-- Scanner Decoded Result Box -->
+      <div id="scan-result-container" class="hidden p-3.5 rounded-xl bg-indigo-50 dark:bg-indigo-950/60 border border-indigo-200 dark:border-indigo-800 space-y-2">
+        <div class="flex items-center justify-between">
+          <span class="text-[11px] font-bold text-indigo-700 dark:text-indigo-300 uppercase tracking-wider">Decoded Content:</span>
+          <span id="scan-status-badge" class="text-[10px] bg-emerald-100 text-emerald-800 dark:bg-emerald-900/60 dark:text-emerald-300 px-2 py-0.5 rounded-full font-bold">Successfully Verified</span>
+        </div>
+        <div id="scan-result-text" class="text-xs font-mono break-all text-slate-800 dark:text-slate-100 select-all p-2 rounded bg-white dark:bg-slate-900 border border-indigo-100 dark:border-slate-800"></div>
+        <div class="flex gap-2">
+          <a id="scan-open-link" href="#" target="_blank" rel="noopener noreferrer" class="hidden text-xs text-indigo-600 dark:text-indigo-400 font-semibold hover:underline flex items-center gap-1">
+            <i class="fa-solid fa-arrow-up-right-from-square"></i> Open in browser
+          </a>
+          <button id="scan-copy-content" class="text-xs text-slate-500 hover:text-slate-700 dark:text-slate-400 font-semibold flex items-center gap-1 ml-auto">
+            <i class="fa-regular fa-copy"></i> Copy text
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <footer class="no-print mt-12 py-6 border-t border-slate-200/80 dark:border-slate-800/80 text-center text-xs text-slate-400">
+    <div class="max-w-7xl mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-3">
+      <p>© QR Code Studio Pro. High-fidelity vector generation engine.</p>
+      <div class="flex items-center gap-4 text-slate-500">
+        <span class="flex items-center gap-1"><i class="fa-solid fa-shield-halved text-emerald-500"></i> Client-side private rendering</span>
+        <span>•</span>
+        <span>Vector SVG & PNG ready</span>
+      </div>
+    </div>
+  </footer>
+
+  <!-- Main Application Logic -->
+  <script>
+    /**
+     * Application State
+     */
+    const state = {
+      type: 'url',
+      rawText: 'https://google.com',
+      fgColor: '#0f172a',
+      bgColor: '#ffffff',
+      isTransparent: false,
+      dotStyle: 'rounded',
+      cornerStyle: 'extra-rounded',
+      ecc: 'Q',
+      size: 400,
+      logoSrc: '',
+      frameStyle: 'bottom-banner',
+      frameText: 'SCAN ME',
+      frameColor: '#4f46e5',
+      frameTextColor: '#ffffff',
+      history: []
+    };
+
+    // Preset Icons mapping (Embedded clean SVG data URLs for instant rendering without CORS issues)
+    const iconPresets = {
+      none: '',
+      globe: 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="%232563eb"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 17.93c-3.95-.49-7-3.85-7-7.93 0-.62.08-1.21.21-1.79L9 15v1c0 1.1.9 2 2 2v1.93zm6.9-2.54c-.26-.81-1-1.39-1.9-1.39h-1v-3c0-.55-.45-1-1-1H8v-2h2c.55 0 1-.45 1-1V7h2c1.1 0 2-.9 2-2v-.41c2.93 1.19 5 4.06 5 7.41 0 2.08-.8 3.97-2.1 5.39z"/></svg>',
+      github: 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="%23181717"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/></svg>',
+      twitter: 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="%23000000"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>',
+      youtube: 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="%23FF0000"><path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/></svg>',
+      linkedin: 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="%230A66C2"><path d="M19 3a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h14m-.5 15.5v-5.3a3.26 3.26 0 0 0-3.26-3.26c-.85 0-1.84.52-2.28 1.3v-1.11h-2.79v8.37h2.79v-4.93c0-.77.62-1.4 1.39-1.4a1.4 1.4 0 0 1 1.4 1.4v4.93h2.75M6.46 8.76a1.53 1.53 0 1 0 0-3.06 1.53 1.53 0 0 0 0 3.06m1.4 9.74v-8.37H5.06v8.37h2.8z"/></svg>',
+      instagram: 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="%23E4405F"><path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zm0-2.163c-3.259 0-3.667.014-4.947.072-4.358.2-6.78 2.618-6.98 6.98-.059 1.281-.073 1.689-.073 4.948 0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98 1.281.058 1.689.072 4.948.072 3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98-1.281-.059-1.69-.073-4.949-.073zm0 5.838c-3.403 0-6.162 2.759-6.162 6.162s2.759 6.163 6.162 6.163 6.162-2.759 6.162-6.163c0-3.403-2.759-6.162-6.162-6.162zm0 10.162c-2.209 0-4-1.79-4-4 0-2.209 1.791-4 4-4s4 1.791 4 4c0 2.21-1.791 4-4 4zm6.406-11.845c-.796 0-1.441.645-1.441 1.44s.645 1.44 1.441 1.44c.795 0 1.439-.645 1.439-1.44s-.644-1.44-1.439-1.44z"/></svg>'
+    };
+
+    /**
+     * QRCodeStyling Instance
+     */
+    let qrCodeInstance = null;
+
+    function initQRCode() {
+      qrCodeInstance = new QRCodeStyling({
+        width: state.size,
+        height: state.size,
+        data: state.rawText,
+        image: state.logoSrc || undefined,
+        dotsOptions: {
+          color: state.fgColor,
+          type: state.dotStyle
+        },
+        backgroundOptions: {
+          color: state.isTransparent ? 'transparent' : state.bgColor,
+        },
+        imageOptions: {
+          crossOrigin: 'anonymous',
+          margin: 6,
+          imageSize: 0.35,
+          hideBackgroundDots: true
+        },
+        cornersSquareOptions: {
+          color: state.fgColor,
+          type: state.cornerStyle
+        },
+        qrOptions: {
+          errorCorrectionLevel: state.ecc
+        }
+      });
+
+      const container = document.getElementById('qr-render-target');
+      container.innerHTML = '';
+      qrCodeInstance.append(container);
+    }
+
+    function updateQRCode() {
+      if (!qrCodeInstance) return;
+
+      qrCodeInstance.update({
+        width: state.size,
+        height: state.size,
+        data: state.rawText || ' ',
+        image: state.logoSrc || undefined,
+        dotsOptions: {
+          color: state.fgColor,
+          type: state.dotStyle
+        },
+        backgroundOptions: {
+          color: state.isTransparent ? 'transparent' : state.bgColor,
+        },
+        cornersSquareOptions: {
+          color: state.fgColor,
+          type: state.cornerStyle
+        },
+        qrOptions: {
+          errorCorrectionLevel: state.ecc
+        }
+      });
+
+      // Update frame styling
+      renderFrameStyling();
+    }
+
+    /**
+     * Render Frame / Banner presentation
+     */
+    function renderFrameStyling() {
+      const topHeader = document.getElementById('frame-top-header');
+      const bottomBadge = document.getElementById('frame-bottom-badge');
+      const captionText = document.getElementById('frame-caption-text');
+      const wrapperBox = document.getElementById('qr-wrapper-box');
+
+      captionText.textContent = state.frameText || 'SCAN ME';
+      bottomBadge.style.backgroundColor = state.frameColor;
+      bottomBadge.style.color = state.frameTextColor;
+
+      // Handle transparent mode border
+      if (state.isTransparent) {
+        wrapperBox.style.backgroundColor = 'transparent';
+        wrapperBox.classList.add('border', 'border-dashed', 'border-slate-300', 'dark:border-slate-700');
+      } else {
+        wrapperBox.style.backgroundColor = state.bgColor;
+        wrapperBox.classList.remove('border', 'border-dashed', 'border-slate-300', 'dark:border-slate-700');
+      }
+
+      if (state.frameStyle === 'none') {
+        topHeader.classList.add('hidden');
+        bottomBadge.classList.add('hidden');
+        wrapperBox.style.border = 'none';
+      } else if (state.frameStyle === 'bottom-banner') {
+        topHeader.classList.add('hidden');
+        bottomBadge.classList.remove('hidden');
+        wrapperBox.style.border = 'none';
+      } else if (state.frameStyle === 'top-bottom') {
+        topHeader.classList.remove('hidden');
+        topHeader.style.backgroundColor = state.frameColor;
+        topHeader.style.color = state.frameTextColor;
+        bottomBadge.classList.remove('hidden');
+        wrapperBox.style.border = 'none';
+      } else if (state.frameStyle === 'minimal-border') {
+        topHeader.classList.add('hidden');
+        bottomBadge.classList.add('hidden');
+        wrapperBox.style.border = `4px solid ${state.frameColor}`;
+      }
+    }
+
+    /**
+     * Compile Text from Active Type Form
+     */
+    function syncInputText() {
+      let finalContent = '';
+      if (state.type === 'url') {
+        const input = document.getElementById('qr-url-input').value.trim();
+        finalContent = input;
+        validateUrl(input);
+      } else if (state.type === 'wifi') {
+        const ssid = document.getElementById('wifi-ssid').value.trim() || 'MyWiFi';
+        const pass = document.getElementById('wifi-pass').value.trim() || '';
+        const enc = document.querySelector('input[name="wifi-type"]:checked').value;
+        finalContent = `WIFI:S:${ssid};T:${enc};P:${pass};;`;
+      } else if (state.type === 'vcard') {
+        const name = document.getElementById('vcard-name').value.trim() || 'Alex Doe';
+        const org = document.getElementById('vcard-org').value.trim();
+        const tel = document.getElementById('vcard-phone').value.trim();
+        const email = document.getElementById('vcard-email').value.trim();
+        finalContent = `BEGIN:VCARD\nVERSION:3.0\nFN:${name}\nORG:${org}\nTEL:${tel}\nEMAIL:${email}\nEND:VCARD`;
+      } else if (state.type === 'email') {
+        const to = document.getElementById('email-to').value.trim();
+        const sub = document.getElementById('email-subject').value.trim();
+        finalContent = `mailto:${to}?subject=${encodeURIComponent(sub)}`;
+      } else if (state.type === 'text') {
+        finalContent = document.getElementById('plain-text-content').value;
+      }
+
+      state.rawText = finalContent;
+      document.getElementById('live-target-type').textContent = state.type.toUpperCase();
+      updateQRCode();
+      debouncedSaveHistory(finalContent);
+    }
+
+    function validateUrl(val) {
+      const fb = document.getElementById('url-feedback');
+      if (!val) {
+        fb.innerHTML = '<span class="text-amber-500"><i class="fa-solid fa-triangle-exclamation"></i> Link is empty</span>';
+        return;
+      }
+      try {
+        const parsed = new URL(val);
+        if (parsed.protocol === 'http:' || parsed.protocol === 'https:') {
+          fb.innerHTML = '<span class="text-emerald-500"><i class="fa-solid fa-circle-check"></i> Valid secure web address</span>';
+        } else {
+          fb.innerHTML = '<span class="text-slate-400"><i class="fa-solid fa-circle-info"></i> Custom URI scheme detected</span>';
+        }
+      } catch (e) {
+        if (!val.startsWith('http://') && !val.startsWith('https://')) {
+          fb.innerHTML = `<span class="text-amber-500 cursor-pointer hover:underline" id="fix-url-btn"><i class="fa-solid fa-wand-magic-sparkles"></i> Did you mean https://${val}? Click to fix</span>`;
+          const fixBtn = document.getElementById('fix-url-btn');
+          if (fixBtn) {
+            fixBtn.onclick = () => {
+              document.getElementById('qr-url-input').value = 'https://' + val;
+              syncInputText();
+            };
+          }
+        } else {
+          fb.innerHTML = '<span class="text-rose-500"><i class="fa-solid fa-circle-xmark"></i> Invalid URL format</span>';
+        }
+      }
+    }
+
+    /**
+     * History Manager
+     */
+    let historyTimeout;
+    function debouncedSaveHistory(content) {
+      if (!content || content.length < 3) return;
+      clearTimeout(historyTimeout);
+      historyTimeout = setTimeout(() => {
+        saveToHistory(content);
+      }, 1000);
+    }
+
+    function saveToHistory(text) {
+      if (!text || state.history.includes(text)) return;
+      state.history.unshift(text);
+      if (state.history.length > 5) state.history.pop();
+      try {
+        localStorage.setItem('qr_studio_history', JSON.stringify(state.history));
+      } catch (e) {}
+      renderHistory();
+    }
+
+    function renderHistory() {
+      const container = document.getElementById('history-container');
+      const emptyText = document.getElementById('empty-history-text');
+      if (state.history.length === 0) {
+        emptyText.classList.remove('hidden');
+        container.innerHTML = '';
+        container.appendChild(emptyText);
+        return;
+      }
+      emptyText.classList.add('hidden');
+      container.innerHTML = '';
+
+      state.history.forEach((item, idx) => {
+        const div = document.createElement('div');
+        div.className = 'group flex items-center justify-between p-2 rounded-xl text-xs bg-slate-50 dark:bg-slate-800 hover:bg-indigo-50 dark:hover:bg-slate-700 transition cursor-pointer border border-slate-100 dark:border-slate-800';
+        div.innerHTML = `
+          <div class="truncate max-w-[200px] font-mono text-slate-700 dark:text-slate-200">${item}</div>
+          <button class="opacity-0 group-hover:opacity-100 text-indigo-600 dark:text-indigo-400 font-semibold px-1.5 py-0.5 rounded transition">
+            Load
+          </button>
+        `;
+        div.onclick = () => {
+          if (state.type === 'url') {
+            document.getElementById('qr-url-input').value = item;
+          } else if (state.type === 'text') {
+            document.getElementById('plain-text-content').value = item;
+          }
+          syncInputText();
+          showToast('Loaded from history');
+        };
+        container.appendChild(div);
+      });
+    }
+
+    function showToast(msg) {
+      const toast = document.getElementById('toast-message');
+      toast.innerHTML = `<i class="fa-solid fa-check mr-1.5"></i> ${msg}`;
+      toast.classList.remove('hidden');
+      setTimeout(() => {
+        toast.classList.add('hidden');
+      }, 2500);
+    }
+
+    /**
+     * Export / Download Canvas Generator with Banner Frame
+     */
+    async function createCompositeCanvas() {
+      const qrCanvas = document.querySelector('#qr-render-target canvas');
+      if (!qrCanvas) return null;
+
+      // If no banner, return base QR
+      if (state.frameStyle === 'none') {
+        return qrCanvas;
+      }
+
+      // Create composite offscreen canvas including banner frame
+      const canvas = document.createElement('canvas');
+      const ctx = canvas.getContext('2d');
+      const padding = 28;
+      const bannerHeight = 50;
+      const topHeight = state.frameStyle === 'top-bottom' ? 36 : 0;
+
+      canvas.width = qrCanvas.width + (padding * 2);
+      canvas.height = qrCanvas.height + (padding * 2) + bannerHeight + topHeight;
+
+      // Fill background
+      ctx.fillStyle = state.isTransparent ? 'transparent' : state.bgColor;
+      if (!state.isTransparent) {
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+      }
+
+      // Optional Top Header
+      if (state.frameStyle === 'top-bottom') {
+        ctx.fillStyle = state.frameColor;
+        roundRect(ctx, padding, padding, qrCanvas.width, 28, 8, true, false);
+        ctx.fillStyle = state.frameTextColor;
+        ctx.font = 'bold 13px "Space Grotesk", sans-serif';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText('SCAN WITH PHONE', canvas.width / 2, padding + 14);
+      }
+
+      // Draw QR Canvas
+      const qrY = padding + topHeight;
+      ctx.drawImage(qrCanvas, padding, qrY);
+
+      // Draw Bottom Badge
+      const badgeY = qrY + qrCanvas.height + 12;
+      ctx.fillStyle = state.frameColor;
+      roundRect(ctx, padding + 20, badgeY, qrCanvas.width - 40, 38, 12, true, false);
+
+      ctx.fillStyle = state.frameTextColor;
+      ctx.font = 'bold 15px "Space Grotesk", sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(state.frameText || 'SCAN ME', canvas.width / 2, badgeY + 19);
+
+      return canvas;
+    }
+
+    function roundRect(ctx, x, y, width, height, radius, fill, stroke) {
+      ctx.beginPath();
+      ctx.moveTo(x + radius, y);
+      ctx.lineTo(x + width - radius, y);
+      ctx.quadraticCurveTo(x + width, y, x + width, y + radius);
+      ctx.lineTo(x + width, y + height - radius);
+      ctx.quadraticCurveTo(x + width, y + height, x + width - radius, y + height);
+      ctx.lineTo(x + radius, y + height);
+      ctx.quadraticCurveTo(x, y + height, x, y + height - radius);
+      ctx.lineTo(x, y + radius);
+      ctx.quadraticCurveTo(x, y, x + radius, y);
+      ctx.closePath();
+      if (fill) ctx.fill();
+      if (stroke) ctx.stroke();
+    }
+
+    /**
+     * Wire Up Event Listeners
+     */
+    document.addEventListener('DOMContentLoaded', () => {
+      // 1. Initial State & Render
+      try {
+        const savedHist = localStorage.getItem('qr_studio_history');
+        if (savedHist) state.history = JSON.parse(savedHist);
+      } catch (e) {}
+
+      initQRCode();
+      renderFrameStyling();
+      renderHistory();
+
+      // 2. Theme Toggle
+      const themeToggle = document.getElementById('theme-toggle');
+      themeToggle.addEventListener('click', () => {
+        document.documentElement.classList.toggle('dark');
+      });
+
+      // 3. Tab Form Switching
+      const typeBtns = document.querySelectorAll('.type-btn');
+      const forms = {
+        url: document.getElementById('url-form'),
+        wifi: document.getElementById('wifi-form'),
+        vcard: document.getElementById('vcard-form'),
+        email: document.getElementById('email-form'),
+        text: document.getElementById('plain-text-form')
+      };
+
+      typeBtns.forEach(btn => {
+        btn.addEventListener('click', () => {
+          typeBtns.forEach(b => {
+            b.classList.remove('active', 'bg-indigo-50', 'border-indigo-200', 'text-indigo-700', 'dark:bg-indigo-950/60', 'dark:border-indigo-800', 'dark:text-indigo-300');
+            b.classList.add('border-slate-200', 'dark:border-slate-800', 'text-slate-600', 'dark:text-slate-400');
+          });
+          btn.classList.add('active', 'bg-indigo-50', 'border-indigo-200', 'text-indigo-700', 'dark:bg-indigo-950/60', 'dark:border-indigo-800', 'dark:text-indigo-300');
+          btn.classList.remove('border-slate-200', 'dark:border-slate-800', 'text-slate-600', 'dark:text-slate-400');
+
+          state.type = btn.dataset.type;
+          Object.values(forms).forEach(f => f.classList.add('hidden'));
+          forms[state.type].classList.remove('hidden');
+          syncInputText();
+        });
+      });
+
+      // 4. Input Sync Listeners
+      document.getElementById('qr-url-input').addEventListener('input', syncInputText);
+      document.getElementById('wifi-ssid').addEventListener('input', syncInputText);
+      document.getElementById('wifi-pass').addEventListener('input', syncInputText);
+      document.querySelectorAll('input[name="wifi-type"]').forEach(r => r.addEventListener('change', syncInputText));
+      document.getElementById('vcard-name').addEventListener('input', syncInputText);
+      document.getElementById('vcard-org').addEventListener('input', syncInputText);
+      document.getElementById('vcard-phone').addEventListener('input', syncInputText);
+      document.getElementById('vcard-email').addEventListener('input', syncInputText);
+      document.getElementById('email-to').addEventListener('input', syncInputText);
+      document.getElementById('email-subject').addEventListener('input', syncInputText);
+      document.getElementById('plain-text-content').addEventListener('input', syncInputText);
+
+      document.getElementById('quick-clear-text').addEventListener('click', () => {
+        document.getElementById('qr-url-input').value = '';
+        syncInputText();
+      });
+
+      document.getElementById('clear-input-btn').addEventListener('click', () => {
+        document.getElementById('qr-url-input').value = 'https://google.com';
+        syncInputText();
+      });
+
+      // 5. Colors & Background
+      const fgColorPicker = document.getElementById('qr-fg-color');
+      const fgHexInput = document.getElementById('qr-fg-hex');
+      const bgColorPicker = document.getElementById('qr-bg-color');
+      const bgHexInput = document.getElementById('qr-bg-hex');
+      const bgTransparentToggle = document.getElementById('bg-transparent-toggle');
+
+      fgColorPicker.addEventListener('input', (e) => {
+        state.fgColor = e.target.value;
+        fgHexInput.value = e.target.value;
+        updateQRCode();
+      });
+      fgHexInput.addEventListener('change', (e) => {
+        state.fgColor = e.target.value;
+        fgColorPicker.value = e.target.value;
+        updateQRCode();
+      });
+
+      document.querySelectorAll('.quick-color').forEach(b => {
+        b.addEventListener('click', () => {
+          state.fgColor = b.dataset.color;
+          fgColorPicker.value = b.dataset.color;
+          fgHexInput.value = b.dataset.color;
+          updateQRCode();
+        });
+      });
+
+      bgColorPicker.addEventListener('input', (e) => {
+        state.bgColor = e.target.value;
+        bgHexInput.value = e.target.value;
+        state.isTransparent = false;
+        bgTransparentToggle.checked = false;
+        updateQRCode();
+      });
+      bgHexInput.addEventListener('change', (e) => {
+        state.bgColor = e.target.value;
+        bgColorPicker.value = e.target.value;
+        state.isTransparent = false;
+        bgTransparentToggle.checked = false;
+        updateQRCode();
+      });
+
+      document.querySelectorAll('.quick-bg-color').forEach(b => {
+        b.addEventListener('click', () => {
+          state.bgColor = b.dataset.color;
+          bgColorPicker.value = b.dataset.color;
+          bgHexInput.value = b.dataset.color;
+          state.isTransparent = false;
+          bgTransparentToggle.checked = false;
+          updateQRCode();
+        });
+      });
+
+      bgTransparentToggle.addEventListener('change', (e) => {
+        state.isTransparent = e.target.checked;
+        updateQRCode();
+      });
+
+      // 6. Dot & Corner Styles
+      const dotBtns = document.querySelectorAll('.dot-btn');
+      dotBtns.forEach(btn => {
+        btn.addEventListener('click', () => {
+          dotBtns.forEach(b => {
+            b.classList.remove('active', 'border-indigo-600', 'bg-indigo-50', 'text-indigo-700', 'dark:bg-indigo-950/60', 'dark:text-indigo-300');
+            b.classList.add('border-slate-200', 'dark:border-slate-800');
+          });
+          btn.classList.add('active', 'border-indigo-600', 'bg-indigo-50', 'text-indigo-700', 'dark:bg-indigo-950/60', 'dark:text-indigo-300');
+          btn.classList.remove('border-slate-200', 'dark:border-slate-800');
+          state.dotStyle = btn.dataset.dot;
+          updateQRCode();
+        });
+      });
+
+      const cornerBtns = document.querySelectorAll('.corner-btn');
+      cornerBtns.forEach(btn => {
+        btn.addEventListener('click', () => {
+          cornerBtns.forEach(b => {
+            b.classList.remove('active', 'border-indigo-600', 'bg-indigo-50', 'text-indigo-700', 'dark:bg-indigo-950/60', 'dark:text-indigo-300');
+            b.classList.add('border-slate-200', 'dark:border-slate-800');
+          });
+          btn.classList.add('active', 'border-indigo-600', 'bg-indigo-50', 'text-indigo-700', 'dark:bg-indigo-950/60', 'dark:text-indigo-300');
+          btn.classList.remove('border-slate-200', 'dark:border-slate-800');
+          state.cornerStyle = btn.dataset.corner;
+          updateQRCode();
+        });
+      });
+
+      // 7. Logo & Icon Presets
+      const presetLogoBtns = document.querySelectorAll('.preset-logo-btn');
+      const removeLogoBtn = document.getElementById('remove-logo-btn');
+      presetLogoBtns.forEach(btn => {
+        btn.addEventListener('click', () => {
+          presetLogoBtns.forEach(b => {
+            b.classList.remove('active', 'border-indigo-600', 'bg-indigo-50', 'text-indigo-700', 'dark:bg-indigo-950/60', 'dark:text-indigo-300');
+            b.classList.add('border-slate-200', 'dark:border-slate-800');
+          });
+          btn.classList.add('active', 'border-indigo-600', 'bg-indigo-50', 'text-indigo-700', 'dark:bg-indigo-950/60', 'dark:text-indigo-300');
+          btn.classList.remove('border-slate-200', 'dark:border-slate-800');
+
+          const iconKey = btn.dataset.icon;
+          state.logoSrc = iconPresets[iconKey] || '';
+          if (state.logoSrc) {
+            removeLogoBtn.classList.remove('hidden');
+          } else {
+            removeLogoBtn.classList.add('hidden');
+          }
+          updateQRCode();
+        });
+      });
+
+      // Custom Logo Upload
+      const logoFileInput = document.getElementById('logo-file-input');
+      logoFileInput.addEventListener('change', (e) => {
+        const file = e.target.files[0];
+        if (file) {
+          const reader = new FileReader();
+          reader.onload = (event) => {
+            state.logoSrc = event.target.result;
+            removeLogoBtn.classList.remove('hidden');
+            presetLogoBtns.forEach(b => b.classList.remove('active', 'border-indigo-600', 'bg-indigo-50', 'text-indigo-700'));
+            updateQRCode();
+          };
+          reader.readAsDataURL(file);
+        }
+      });
+
+      removeLogoBtn.addEventListener('click', () => {
+        state.logoSrc = '';
+        removeLogoBtn.classList.add('hidden');
+        presetLogoBtns.forEach(b => {
+          if (b.dataset.icon === 'none') {
+            b.classList.add('active', 'border-indigo-600', 'bg-indigo-50', 'text-indigo-700');
+          } else {
+            b.classList.remove('active', 'border-indigo-600', 'bg-indigo-50', 'text-indigo-700');
+          }
+        });
+        updateQRCode();
+      });
+
+      // 8. Callout Banner & Frame Controls
+      const frameTextInput = document.getElementById('frame-text-input');
+      const frameStyleSelect = document.getElementById('frame-style-select');
+      const frameColorPicker = document.getElementById('frame-color-picker');
+      const frameTextColorPicker = document.getElementById('frame-text-color-picker');
+
+      frameTextInput.addEventListener('input', (e) => {
+        state.frameText = e.target.value;
+        renderFrameStyling();
+      });
+
+      frameStyleSelect.addEventListener('change', (e) => {
+        state.frameStyle = e.target.value;
+        renderFrameStyling();
+      });
+
+      frameColorPicker.addEventListener('input', (e) => {
+        state.frameColor = e.target.value;
+        document.getElementById('frame-color-display').textContent = e.target.value.toUpperCase();
+        renderFrameStyling();
+      });
+
+      frameTextColorPicker.addEventListener('input', (e) => {
+        state.frameTextColor = e.target.value;
+        document.getElementById('frame-text-color-display').textContent = e.target.value.toUpperCase();
+        renderFrameStyling();
+      });
+
+      // 9. ECC and Resolution Size
+      document.getElementById('ecc-select').addEventListener('change', (e) => {
+        state.ecc = e.target.value;
+        updateQRCode();
+      });
+
+      const sizeSlider = document.getElementById('size-slider');
+      const resDisplay = document.getElementById('resolution-display');
+      sizeSlider.addEventListener('input', (e) => {
+        state.size = parseInt(e.target.value, 10);
+        resDisplay.textContent = `${state.size} × ${state.size} px`;
+        updateQRCode();
+      });
+
+      // 10. Downloads & Copy
+      document.getElementById('download-png-btn').addEventListener('click', async () => {
+        const composite = await createCompositeCanvas();
+        if (!composite) return;
+        const link = document.createElement('a');
+        link.download = `qrcode-${Date.now()}.png`;
+        link.href = composite.toDataURL('image/png');
+        link.click();
+        showToast('PNG Downloaded!');
+      });
+
+      document.getElementById('download-jpeg-btn').addEventListener('click', async () => {
+        const composite = await createCompositeCanvas();
+        if (!composite) return;
+        const link = document.createElement('a');
+        link.download = `qrcode-${Date.now()}.jpg`;
+        link.href = composite.toDataURL('image/jpeg', 0.95);
+        link.click();
+        showToast('JPEG Downloaded!');
+      });
+
+      document.getElementById('download-svg-btn').addEventListener('click', () => {
+        if (!qrCodeInstance) return;
+        qrCodeInstance.download({ extension: 'svg', name: `qrcode-${Date.now()}` });
+        showToast('SVG Downloaded!');
+      });
+
+      document.getElementById('copy-qr-btn').addEventListener('click', async () => {
+        try {
+          const composite = await createCompositeCanvas();
+          if (!composite) return;
+          composite.toBlob(async (blob) => {
+            if (!blob) return;
+            try {
+              if (navigator.clipboard && navigator.clipboard.write) {
+                await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]);
+                showToast('Image copied to clipboard!');
+              } else {
+                // Fallback copy content text
+                document.execCommand('copy');
+                showToast('Copied link text!');
+              }
+            } catch (err) {
+              showToast('Copy text ready in clipboard');
+            }
+          });
+        } catch (e) {
+          showToast('Could not copy image directly');
+        }
+      });
+
+      // 11. Print Ready Sheet
+      document.getElementById('print-sheet-btn').addEventListener('click', () => {
+        window.print();
+      });
+
+      // Clear History Button
+      document.getElementById('clear-history-btn').addEventListener('click', () => {
+        state.history = [];
+        try {
+          localStorage.removeItem('qr_studio_history');
+        } catch (e) {}
+        renderHistory();
+      });
+
+      // 12. Self Verify & Scanner Modal
+      const scannerModal = document.getElementById('scanner-modal');
+      const openScannerBtn = document.getElementById('toggle-scanner-modal-btn');
+      const closeScannerBtn = document.getElementById('close-scanner-modal');
+      const quickTestBtn = document.getElementById('quick-test-btn');
+
+      openScannerBtn.addEventListener('click', () => {
+        scannerModal.classList.remove('hidden');
+        scannerModal.classList.add('flex');
+      });
+
+      closeScannerBtn.addEventListener('click', () => {
+        stopCamera();
+        scannerModal.classList.add('hidden');
+        scannerModal.classList.remove('flex');
+      });
+
+      // Quick test directly verifies current canvas
+      quickTestBtn.addEventListener('click', () => {
+        const qrCanvas = document.querySelector('#qr-render-target canvas');
+        if (!qrCanvas) return;
+        const ctx = qrCanvas.getContext('2d');
+        const imgData = ctx.getImageData(0, 0, qrCanvas.width, qrCanvas.height);
+        const code = jsQR(imgData.data, imgData.width, imgData.height);
+
+        scannerModal.classList.remove('hidden');
+        scannerModal.classList.add('flex');
+
+        const resultContainer = document.getElementById('scan-result-container');
+        const resultText = document.getElementById('scan-result-text');
+        const openLink = document.getElementById('scan-open-link');
+
+        if (code) {
+          resultContainer.classList.remove('hidden');
+          resultText.textContent = code.data;
+          document.getElementById('scan-status-badge').textContent = 'Live Code Verified';
+          document.getElementById('scan-status-badge').className = 'text-[10px] bg-emerald-100 text-emerald-800 dark:bg-emerald-900/60 dark:text-emerald-300 px-2 py-0.5 rounded-full font-bold';
+
+          if (code.data.startsWith('http://') || code.data.startsWith('https://')) {
+            openLink.href = code.data;
+            openLink.classList.remove('hidden');
+          } else {
+            openLink.classList.add('hidden');
+          }
+        } else {
+          resultContainer.classList.remove('hidden');
+          resultText.textContent = 'Could not decode. Try higher Error Correction (ECC Q or H) or increase resolution.';
+          document.getElementById('scan-status-badge').textContent = 'Warning';
+          document.getElementById('scan-status-badge').className = 'text-[10px] bg-amber-100 text-amber-800 px-2 py-0.5 rounded-full font-bold';
+          openLink.classList.add('hidden');
+        }
+      });
+
+      // Scanner WebCam Logic
+      let videoStream = null;
+      let animationFrameId = null;
+      const startCamBtn = document.getElementById('start-camera-btn');
+      const stopCamBtn = document.getElementById('stop-camera-btn');
+      const videoEl = document.getElementById('scanner-video');
+      const canvasEl = document.getElementById('scanner-canvas');
+      const placeholderEl = document.getElementById('scanner-placeholder');
+
+      startCamBtn.addEventListener('click', async () => {
+        try {
+          videoStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
+          videoEl.srcObject = videoStream;
+          videoEl.classList.remove('hidden');
+          placeholderEl.classList.add('hidden');
+          startCamBtn.classList.add('hidden');
+          stopCamBtn.classList.remove('hidden');
+          videoEl.play();
+          requestAnimationFrame(scanVideoFrame);
+        } catch (err) {
+          showToast('Camera access denied or unavailable');
+        }
+      });
+
+      function stopCamera() {
+        if (videoStream) {
+          videoStream.getTracks().forEach(track => track.stop());
+          videoStream = null;
+        }
+        if (animationFrameId) {
+          cancelAnimationFrame(animationFrameId);
+        }
+        videoEl.classList.add('hidden');
+        placeholderEl.classList.remove('hidden');
+        startCamBtn.classList.remove('hidden');
+        stopCamBtn.classList.add('hidden');
+      }
+
+      stopCamBtn.addEventListener('click', stopCamera);
+
+      function scanVideoFrame() {
+        if (videoEl.readyState === videoEl.HAVE_ENOUGH_DATA) {
+          canvasEl.height = videoEl.videoHeight;
+          canvasEl.width = videoEl.videoWidth;
+          const ctx = canvasEl.getContext('2d');
+          ctx.drawImage(videoEl, 0, 0, canvasEl.width, canvasEl.height);
+          const imageData = ctx.getImageData(0, 0, canvasEl.width, canvasEl.height);
+          const code = jsQR(imageData.data, imageData.width, imageData.height, {
+            inversionAttempts: 'dontInvert',
+          });
+
+          if (code) {
+            displayScanResult(code.data);
+            stopCamera();
+            return;
+          }
+        }
+        animationFrameId = requestAnimationFrame(scanVideoFrame);
+      }
+
+      // Scanner Image File Upload
+      const scanFileInput = document.getElementById('scan-file-input');
+      scanFileInput.addEventListener('change', (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+
+        const reader = new FileReader();
+        reader.onload = (event) => {
+          const img = new Image();
+          img.onload = () => {
+            const canvas = document.createElement('canvas');
+            canvas.width = img.width;
+            canvas.height = img.height;
+            const ctx = canvas.getContext('2d');
+            ctx.drawImage(img, 0, 0);
+            const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+            const code = jsQR(imgData.data, imgData.width, imgData.height);
+            if (code) {
+              displayScanResult(code.data);
+            } else {
+              displayScanResult(null);
+            }
+          };
+          img.src = event.target.result;
+        };
+        reader.readAsDataURL(file);
+      });
+
+      function displayScanResult(text) {
+        const resultContainer = document.getElementById('scan-result-container');
+        const resultText = document.getElementById('scan-result-text');
+        const openLink = document.getElementById('scan-open-link');
+
+        resultContainer.classList.remove('hidden');
+        if (text) {
+          resultText.textContent = text;
+          document.getElementById('scan-status-badge').textContent = 'Decoded Successfully';
+          document.getElementById('scan-status-badge').className = 'text-[10px] bg-emerald-100 text-emerald-800 dark:bg-emerald-900/60 dark:text-emerald-300 px-2 py-0.5 rounded-full font-bold';
+
+          if (text.startsWith('http://') || text.startsWith('https://')) {
+            openLink.href = text;
+            openLink.classList.remove('hidden');
+          } else {
+            openLink.classList.add('hidden');
+          }
+        } else {
+          resultText.textContent = 'No QR code could be found or decoded from the uploaded image.';
+          document.getElementById('scan-status-badge').textContent = 'Not Found';
+          document.getElementById('scan-status-badge').className = 'text-[10px] bg-rose-100 text-rose-800 px-2 py-0.5 rounded-full font-bold';
+          openLink.classList.add('hidden');
+        }
+      }
+
+      // Copy scanned text
+      document.getElementById('scan-copy-content').addEventListener('click', () => {
+        const text = document.getElementById('scan-result-text').textContent;
+        if (text) {
+          const temp = document.createElement('textarea');
+          temp.value = text;
+          document.body.appendChild(temp);
+          temp.select();
+          document.execCommand('copy');
+          document.body.removeChild(temp);
+          showToast('Copied scanned text!');
+        }
+      });
+
+    });
+  </script>
+</body>
+</html>
